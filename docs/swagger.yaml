@@ -1,0 +1,295 @@
+basePath: /chessserver/v1
+definitions:
+  api.GameNameAndID:
+    properties:
+      boardid:
+        type: integer
+      name:
+        type: string
+    type: object
+  api.ReqDeleteSessions:
+    properties:
+      boardid:
+        type: integer
+    type: object
+  api.ReqPostSessions:
+    properties:
+      name:
+        type: string
+    type: object
+  api.ReqPutGame:
+    properties:
+      boardid:
+        type: integer
+      color:
+        type: string
+      move:
+        type: string
+      reqtype:
+        description: '"forfeit" "move" "randommove"'
+        type: string
+    type: object
+  api.ReqPutSessions:
+    properties:
+      boardid:
+        type: integer
+      color:
+        type: string
+    type: object
+  api.RespGetSessions:
+    properties:
+      games:
+        items:
+          $ref: '#/definitions/api.GameNameAndID'
+        type: array
+    type: object
+  api.RespPostSessions:
+    properties:
+      boardid:
+        type: integer
+      password:
+        type: string
+    type: object
+  api.RespPutSessions:
+    properties:
+      token:
+        type: string
+    type: object
+info:
+  contact:
+    email: mate.tirpak@gmail.com
+    name: Mate Tirpak
+    url: https://github.com/matetirpak
+  description: This is a RESTful API for a chess server featuring parallel games for
+    bot experimentation.
+  license:
+    name: MIT
+    url: https://github.com/matetirpak/chessbot-playground/blob/main/LICENSE
+  title: Chessbot Playground API
+  version: "1.0"
+paths:
+  /chessserver/v1/game:
+    get:
+      consumes:
+      - application/json
+      description: Requesting the board state requires the 'moveidx' parameter. Requesting
+        possible moves of a piece requires 'row' and 'col'. 'turn' holds the request
+        till it's the players turn.
+      parameters:
+      - description: Index of move (for board state)
+        in: query
+        name: moveidx
+        type: integer
+      - description: Board ID
+        in: query
+        name: boardid
+        required: true
+        type: integer
+      - description: Color ('w' or 'b')
+        in: query
+        name: color
+        required: true
+        type: string
+      - description: Row of piece (for moves)
+        in: query
+        name: row
+        type: integer
+      - description: Column of piece (for moves)
+        in: query
+        name: col
+        type: integer
+      - description: 'Request type: ''state'', ''turn'' or ''moves'''
+        in: query
+        name: reqtype
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'Returns one of: BoardState (reqtype=state), []RespMove (reqtype=moves),
+            or {} (reqtype=turn)". Defined at internal/api/structs.go'
+          schema: {}
+        "400":
+          description: Bad request (invalid parameters or out-of-range index)
+          schema:
+            type: string
+        "401":
+          description: Unauthorized (missing/invalid token)
+          schema:
+            type: string
+        "404":
+          description: Not found – Game does not exist
+          schema:
+            type: string
+        "408":
+          description: Timeout waiting for turn
+          schema:
+            type: string
+        "500":
+          description: Internal server error during move generation
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Extract board, possible moves or wait for a turn notification
+      tags:
+      - game
+    put:
+      consumes:
+      - application/json
+      description: Applies a specified (valid) move, random move, or forfeits the
+        game. Applying a specific move requires the move variable, e.g. "e2 e4".
+      parameters:
+      - description: 'reqtype: ''move'' (requires ''move'' variable), ''randommove'',
+          ''forfeit'''
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.ReqPutGame'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success (No Content)
+          schema:
+            type: string
+        "400":
+          description: Bad request (invalid parameters, move, or game state)
+          schema:
+            type: string
+        "401":
+          description: Unauthorized (missing or invalid token)
+          schema:
+            type: string
+        "404":
+          description: Not found – Game does not exist
+          schema:
+            type: string
+        "500":
+          description: Internal server error during move processing
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Applies an action to a game
+      tags:
+      - game
+  /chessserver/v1/sessions:
+    delete:
+      consumes:
+      - application/json
+      description: Given the board-id, deletes the session if the correct session
+        token was provided.
+      parameters:
+      - description: Request payload with board-id
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.ReqDeleteSessions'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success (No Content)
+          schema:
+            type: string
+        "400":
+          description: Bad request (invalid JSON body)
+          schema:
+            type: string
+        "401":
+          description: Unauthorized (missing or invalid session token)
+          schema:
+            type: string
+        "404":
+          description: Not found – Game session does not exist
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Deletes a session
+      tags:
+      - sessions
+    get:
+      description: Returns a list of all existing sessions. No request body or parameters
+        are required.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of all game sessions
+          schema:
+            $ref: '#/definitions/api.RespGetSessions'
+      summary: Displays all existing sessions
+      tags:
+      - sessions
+    post:
+      consumes:
+      - application/json
+      description: Initializes a new session in the server. The response contains
+        an ID and password.
+      parameters:
+      - description: Request payload with desired session name
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.ReqPostSessions'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Session/Board ID and password
+          schema:
+            $ref: '#/definitions/api.RespPostSessions'
+        "400":
+          description: Bad request (invalid JSON body)
+          schema:
+            type: string
+      summary: Creates a new session
+      tags:
+      - sessions
+    put:
+      consumes:
+      - application/json
+      description: Registers a player (white or black) to an existing game session
+        using the board ID and a session password.
+      parameters:
+      - description: Request payload with session access data and desired color
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.ReqPutSessions'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Color-specific Player token
+          schema:
+            $ref: '#/definitions/api.RespPutSessions'
+        "400":
+          description: Bad request – Invalid JSON or color value
+          schema:
+            type: string
+        "401":
+          description: Unauthorized – Missing or invalid bearer token
+          schema:
+            type: string
+        "403":
+          description: Forbidden – Game is full or color already taken
+          schema:
+            type: string
+        "404":
+          description: Not found – Game session does not exist
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Register as a player in a session
+      tags:
+      - sessions
+swagger: "2.0"
